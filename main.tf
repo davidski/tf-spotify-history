@@ -86,6 +86,7 @@ data "aws_iam_policy_document" "policy" {
       "s3:DeleteObject",
       "s3:GetObject",
       "s3:PutObject",
+      "s3:ListBucket",
     ]
 
     resources = ["arn:aws:s3:::*"]
