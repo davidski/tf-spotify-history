@@ -1,7 +1,7 @@
 provider "aws" {
-  region  = "${var.aws_region}"
-  profile = "${var.aws_profile}"
-  version = "~> 1.54"
+  region  = var.aws_region
+  profile = var.aws_profile
+  version = "~> 2.7"
 
   assume_role {
     role_arn = "arn:aws:iam::754135023419:role/administrator-service"
@@ -18,7 +18,7 @@ data "aws_caller_identity" "current" {}
 data "terraform_remote_state" "main" {
   backend = "s3"
 
-  config {
+  config = {
     bucket  = "infrastructure-severski"
     key     = "terraform/infrastructure.tfstate"
     region  = "us-west-2"
@@ -37,18 +37,18 @@ resource "aws_s3_bucket" "spotify" {
   bucket = "spotify-severski"
 
   logging {
-    target_bucket = "${data.terraform_remote_state.main.auditlogs}"
+    target_bucket = data.terraform_remote_state.main.outputs.auditlogs
     target_prefix = "s3logs/spotify-severski/"
   }
 
   logging {
-    target_bucket = "${data.terraform_remote_state.main.auditlogs}"
+    target_bucket = data.terraform_remote_state.main.outputs.auditlogs
     target_prefix = "s3logs/spotify-severski/"
   }
 
-  tags {
+  tags = {
     Name       = "Spotify data files"
-    project    = "${var.project}"
+    project    = var.project
     managed_by = "Terraform"
   }
 }
@@ -97,21 +97,21 @@ data "aws_iam_policy_document" "policy" {
 resource "aws_iam_policy" "policy" {
   name   = "lambda_spotify_history"
   path   = "/"
-  policy = "${data.aws_iam_policy_document.policy.json}"
+  policy = data.aws_iam_policy_document.policy.json
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_worker" {
-  role       = "${aws_iam_role.lambda_worker.id}"
-  policy_arn = "${aws_iam_policy.policy.arn}"
+  role       = aws_iam_role.lambda_worker.id
+  policy_arn = aws_iam_policy.policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_worker_logs" {
-  role       = "${aws_iam_role.lambda_worker.id}"
+  role       = aws_iam_role.lambda_worker.id
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 output "lambda_role_arn" {
-  value = "${aws_iam_role.lambda_worker.arn}"
+  value = aws_iam_role.lambda_worker.arn
 }
 
 /*
@@ -127,24 +127,24 @@ resource "aws_cloudwatch_event_rule" "default" {
 }
 
 resource "aws_cloudwatch_event_target" "default" {
-  rule      = "${aws_cloudwatch_event_rule.default.name}"
+  rule      = aws_cloudwatch_event_rule.default.name
   target_id = "TriggerSpotifyHistory"
-  arn       = "${aws_lambda_function.spotify_history.arn}"
+  arn       = aws_lambda_function.spotify_history.arn
 }
 
 resource "aws_lambda_permission" "from_cloudwatch_events" {
   statement_id  = "AllowExecutionFromCWEvents"
   action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.spotify_history.arn}"
+  function_name = aws_lambda_function.spotify_history.arn
   principal     = "events.amazonaws.com"
-  source_arn    = "${aws_cloudwatch_event_rule.default.arn}"
+  source_arn    = aws_cloudwatch_event_rule.default.arn
 }
 
 resource "aws_lambda_function" "spotify_history" {
   s3_bucket     = "artifacts-severski"
   s3_key        = "lambdas/spotify-history.zip"
   function_name = "spotify_history"
-  role          = "${aws_iam_role.lambda_worker.arn}"
+  role          = aws_iam_role.lambda_worker.arn
   handler       = "main.lambda_handler"
   description   = "Update Spotify played tracks hsitory"
   runtime       = "python3.6"
@@ -152,15 +152,15 @@ resource "aws_lambda_function" "spotify_history" {
 
   environment {
     variables = {
-      SPOTIFY_CLIENT_ID     = "${var.client_id}"
-      SPOTIFY_CLIENT_SECRET = "${var.client_secret}"
-      SPOTIFY_BUCKET_NAME   = "${aws_s3_bucket.spotify.id}"
-      SPOTIFY_BUCKET_PATH   = "${var.bucket_key}"
+      SPOTIFY_CLIENT_ID     = var.client_id
+      SPOTIFY_CLIENT_SECRET = var.client_secret
+      SPOTIFY_BUCKET_NAME   = aws_s3_bucket.spotify.id
+      SPOTIFY_BUCKET_PATH   = var.bucket_key
     }
   }
 
-  tags {
-    project    = "${var.project}"
+  tags = {
+    project    = var.project
     managed_by = "Terraform"
   }
 }
